@@ -1,0 +1,5 @@
+
+CFLAGS += -DRIOT=1
+
+INCLUDES += -I$(PKGDIRBASE)/reactor-uc/include
+

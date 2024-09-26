@@ -1,6 +1,6 @@
 PKG_NAME=reactor-uc
-PKG_URL=https://github.com/tanneberger/reactor-uc.git
-PKG_VERSION=458d74fd6353172a3fc5c750e0dbc733477b0f4a
+PKG_URL=https://github.com/erlingrj/reactor-uc.git
+PKG_VERSION=4c6f0ab279c7250cebc9b5168c4fcbd7664e4714
 PKG_LICENSE=BSD
 
 include $(RIOTBASE)/pkg/pkg.mk

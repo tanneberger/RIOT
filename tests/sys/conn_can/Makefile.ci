@@ -1,8 +1,6 @@
 BOARD_INSUFFICIENT_MEMORY := \
     airfy-beacon \
     calliope-mini \
-    hifive1 \
-    hifive1b \
     i-nucleo-lrwan1 \
     im880b \
     microbit \
@@ -28,5 +26,4 @@ BOARD_INSUFFICIENT_MEMORY := \
     stm32l0538-disco \
     telosb \
     yunjia-nrf51822 \
-    z1 \
     #

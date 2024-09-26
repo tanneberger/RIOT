@@ -32,6 +32,14 @@
 
 #define LINE_LEN            (16)
 
+/* For MSP430 cpu's the last page holds the interrupt vector, although the api
+   should not limit erasing that page, we don't want to break when testing */
+#if defined(CPU_CC430) || defined(CPU_MSP430FXYZ)
+#define TEST_LAST_AVAILABLE_PAGE    (FLASHPAGE_NUMOF - 2)
+#else
+#define TEST_LAST_AVAILABLE_PAGE    (FLASHPAGE_NUMOF - 1)
+#endif
+
 /* When writing raw bytes on flash, data must be correctly aligned. */
 #define ALIGNMENT_ATTR __attribute__((aligned(FLASHPAGE_WRITE_BLOCK_ALIGNMENT)))
 
@@ -99,26 +107,23 @@ static int cmd_info(int argc, char **argv)
     (void)argc;
     (void)argv;
 
-    printf("Flash start addr:\t\t0x%08x\n", (int)CPU_FLASH_BASE);
+    printf("Flash start addr:\t0x%08x\n", (int)CPU_FLASH_BASE);
 #ifdef FLASHPAGE_SIZE
-    printf("Page size:\t\t\t%i\n", (int)FLASHPAGE_SIZE);
+    printf("Page size:\t\t%i\n", (int)FLASHPAGE_SIZE);
 #else
-    puts("Page size:\t\t\tvariable");
+    puts("Page size:\t\tvariable");
 #endif
-    printf("Number of pages:\t\t%i\n", (int)FLASHPAGE_NUMOF);
+    printf("Number of pages:\t%i\n", (int)FLASHPAGE_NUMOF);
 
 #ifdef FLASHPAGE_RWWEE_NUMOF
-    printf("RWWEE Flash start addr:\t\t0x%08x\n", (int)CPU_FLASH_RWWEE_BASE);
-    printf("RWWEE Number of pages:\t\t%i\n", (int)FLASHPAGE_RWWEE_NUMOF);
+    printf("RWWEE Flash start addr:\t0x%08x\n", (int)CPU_FLASH_RWWEE_BASE);
+    printf("RWWEE Number of pages:\t%i\n", (int)FLASHPAGE_RWWEE_NUMOF);
 #endif
 
 #ifdef NVMCTRL_USER
-    printf("AUX page size:\t\t%i\n", FLASH_USER_PAGE_AUX_SIZE + sizeof(nvm_user_page_t));
-    printf("    user area:\t\t%i\n", FLASH_USER_PAGE_AUX_SIZE);
+    printf("AUX page size:\t%i\n", FLASH_USER_PAGE_AUX_SIZE + sizeof(nvm_user_page_t));
+    printf("    user area:\t%i\n", FLASH_USER_PAGE_AUX_SIZE);
 #endif
-
-    printf("Number of first free page: \t%u \n", flashpage_first_free());
-    printf("Number of last free page: \t%u \n", flashpage_last_free());
 
     return 0;
 }
@@ -204,42 +209,29 @@ static int cmd_write(int argc, char **argv)
 }
 #endif
 
-static uint32_t getaddr(const char *str)
+static uintptr_t getaddr(const char *str)
 {
-    uint32_t addr = strtol(str, NULL, 16);
+    uintptr_t addr = (uintptr_t)strtol(str, NULL, 16);
 
     return addr;
 }
 
 static int cmd_write_raw(int argc, char **argv)
 {
-#if (__SIZEOF_POINTER__ == 2)
-    uint16_t addr;
-#else
-    uint32_t addr;
-#endif
+    uintptr_t addr;
 
     if (argc < 3) {
         printf("usage: %s <addr> <data>\n", argv[0]);
         return 1;
     }
 
-#if (__SIZEOF_POINTER__ == 2)
-    addr = (uint16_t) getaddr(argv[1]);
-#else
     addr = getaddr(argv[1]);
-#endif
     /* try to align */
     memcpy(raw_buf, argv[2], strlen(argv[2]));
 
-    flashpage_write((void*)addr, raw_buf, strlen(raw_buf));
-#if (__SIZEOF_POINTER__ == 2)
-    printf("wrote local data to flash address %#" PRIx16 " of len %" PRIuSIZE "\n",
+    flashpage_write((void*)(uintptr_t)addr, raw_buf, strlen(raw_buf));
+    printf("wrote local data to flash address %#" PRIxPTR " of len %" PRIuSIZE "\n",
            addr, strlen(raw_buf));
-#else
-    printf("wrote local data to flash address %#" PRIx32 " of len %" PRIuSIZE "\n",
-           addr, strlen(raw_buf));
-#endif
     return 0;
 }
 
@@ -334,7 +326,6 @@ static int cmd_test_last(int argc, char **argv)
     (void) argc;
     (void) argv;
     char fill = 'a';
-    unsigned last_free = flashpage_last_free();
 
     for (unsigned i = 0; i < sizeof(page_mem); i++) {
         page_mem[i] = (uint8_t)fill++;
@@ -342,10 +333,10 @@ static int cmd_test_last(int argc, char **argv)
             fill = 'a';
         }
     }
-#ifdef __MSP430__
-    printf("The last page holds the ISR vector, so test page %u\n", last_free);
+#if defined(CPU_CC430) || defined(CPU_MSP430FXYZ)
+    printf("The last page holds the ISR vector, so test page %d\n", TEST_LAST_AVAILABLE_PAGE);
 #endif
-    if (flashpage_write_and_verify(last_free, page_mem) != FLASHPAGE_OK) {
+    if (flashpage_write_and_verify(TEST_LAST_AVAILABLE_PAGE, page_mem) != FLASHPAGE_OK) {
         puts("error verifying the content of last page");
         return 1;
     }
@@ -422,23 +413,22 @@ static int cmd_test_last_raw(int argc, char **argv)
 {
     (void) argc;
     (void) argv;
-    unsigned last_free = flashpage_last_free();
 
     memset(raw_buf, 0, sizeof(raw_buf));
 
     /* try to align */
     memcpy(raw_buf, "test12344321tset", 16);
-#ifdef __MSP430__
-    printf("The last page holds the ISR vector, so test page %u\n", last_free);
+#if defined(CPU_CC430) || defined(CPU_MSP430FXYZ)
+    printf("The last page holds the ISR vector, so test page %d\n", TEST_LAST_AVAILABLE_PAGE);
 #endif
 
     /* erase the page first */
-    flashpage_erase(last_free);
+    flashpage_erase(TEST_LAST_AVAILABLE_PAGE);
 
-    flashpage_write(flashpage_addr(last_free), raw_buf, sizeof(raw_buf));
+    flashpage_write(flashpage_addr(TEST_LAST_AVAILABLE_PAGE), raw_buf, sizeof(raw_buf));
 
     /* verify that previous write_raw effectively wrote the desired data */
-    if (memcmp(flashpage_addr(last_free), raw_buf, strlen(raw_buf)) != 0) {
+    if (memcmp(flashpage_addr(TEST_LAST_AVAILABLE_PAGE), raw_buf, strlen(raw_buf)) != 0) {
         puts("error verifying the content of last page");
         return 1;
     }

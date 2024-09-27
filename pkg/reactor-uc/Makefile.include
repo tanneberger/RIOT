@@ -1,5 +1,3 @@
-
 CFLAGS += -DPLATFORM_RIOT
-
 INCLUDES += -I$(PKGDIRBASE)/reactor-uc/include
 
